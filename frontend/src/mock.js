@@ -154,13 +154,14 @@ export const addMember = (member) => {
   const members = getMembers();
   const newMember = {
     ...member,
-    id: `M${String(members.length + 1).padStart(3, '0')}`,
+    id: String(members.length + 1).padStart(3, '0'),
     attendance: []
   };
   members.push(newMember);
   setMembers(members);
   return newMember;
 };
+
 
 export const updateMemberPayment = (memberId, status) => {
   const members = getMembers();
