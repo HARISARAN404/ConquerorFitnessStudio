@@ -60,6 +60,65 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-@app.on_event("shutdown")
-async def shutdown_db_client():
-    client.close()
+@app.on_event("startup")
+async def startup_event():
+    """Initialize storage and data on startup"""
+    logger.info("Starting Conqueror Fitness Studio API")
+
+    # Initialize default data if storage is empty
+    await initialize_default_data(storage_service)
+    logger.info("API initialization complete")
+
+async def initialize_default_data(storage: FileStorageService):
+    """Initialize storage with default data if empty"""
+    # Check if members data exists
+    members = await storage.read_json("members.json")
+
+    if not members:  # Empty storage, initialize with sample data
+        # Import from frontend mock data
+        try:
+            # Add parent directory to path to import frontend data
+            import sys
+            sys.path.append(str(ROOT_DIR.parent))
+            from frontend.src.mock import mockMembers, planOptions
+
+            # Save membership plans
+            await storage.write_json("plans.json", planOptions)
+
+            # Save sample members (convert to match backend format)
+            backend_members = []
+            for member in mockMembers:
+                backend_member = {
+                    "id": member["id"],
+                    "name": member["name"],
+                    "age": member["age"],
+                    "contact": member["contact"],
+                    "email": member["email"],
+                    "photo": member["photo"],
+                    "plan": member["plan"],
+                    "joinDate": member["joinDate"],
+                    "dueDate": member["dueDate"],
+                    "fees": member["fees"],
+                    "paymentStatus": member["paymentStatus"],
+                    "lastPayment": member["lastPayment"],
+                    "attendance": member["attendance"]
+                }
+                backend_members.append(backend_member)
+
+            await storage.write_json("members.json", backend_members)
+            await storage.write_json("attendance.json", {})
+
+            logger.info(f"Initialized storage with {len(backend_members)} sample members")
+        except ImportError as e:
+            logger.warning(f"Could not import frontend data: {e}")
+            # Create minimal default data
+            default_plans = [
+                {"name": "Basic (3 Months)", "price": 4500, "duration": 3},
+                {"name": "Standard (6 Months)", "price": 9000, "duration": 6},
+                {"name": "Premium (12 Months)", "price": 15000, "duration": 12}
+            ]
+
+            await storage.write_json("plans.json", default_plans)
+            await storage.write_json("members.json", [])
+            await storage.write_json("attendance.json", {})
+            logger.info("Created minimal default data")
